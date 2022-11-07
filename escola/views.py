@@ -1,26 +1,36 @@
-from rest_framework import viewsets, generics, status
+from rest_framework import viewsets, generics, status, filters
 from escola.models import Aluno, Curso, Matricula
 from escola.serializer import AlunoSerializer, AlunoSerializerV2, CursoSerializer, MatriculaSerializer, \
     ListaMatriculasAlunoSerializer, ListaAlunosMatriculadosSerializer
 from rest_framework.response import Response
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
+from django_filters.rest_framework import DjangoFilterBackend
 
 
 class AlunosViewSet(viewsets.ModelViewSet):
     """Exibindo todos os alunos e alunas"""
-    queryset = Aluno.objects.all()
-    http_method_names = ['get', 'post', 'put', 'path ']
+    queryset = Aluno.objects.filter(ativo=True)
 
     def get_serializer_class(self):
         if self.request.version == 'v2':
             return AlunoSerializerV2
         else:
             return AlunoSerializer
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+    ordering_fields = ['nome']
+
+    def perform_destroy(self, aluno):
+        aluno.ativo = False
+        aluno.save()
+        aluno.matricula_set.update(ativo=False)
 
 
 class CursosViewSet(viewsets.ModelViewSet):
     """Exibindo todos os cursos"""
     queryset = Curso.objects.all()
     serializer_class = CursoSerializer
+    http_method_names = ['get', 'post', 'put', 'path']
 
     def create(self, request, *args):
         serializer = self.serializer_class(data=request.data)
@@ -36,24 +46,24 @@ class MatriculaViewSet(viewsets.ModelViewSet):
     """Listando todas as matrículas"""
     queryset = Matricula.objects.all()
     serializer_class = MatriculaSerializer
-    http_method_names = ['get', 'post', 'put', 'path ']
+    http_method_names = ['get', 'post', 'put', 'path']
+
+    @method_decorator(cache_page(20))
+    def dispatch(self, *args, **kwargs):
+        return super(MatriculaViewSet, self).dispatch(*args, **kwargs)
 
 
 class ListaMatriculasAluno(generics.ListAPIView):
     """Listando as matrículas de um aluno ou aluna"""
-
     def get_queryset(self):
         queryset = Matricula.objects.filter(aluno_id=self.kwargs['pk'])
         return queryset
-
     serializer_class = ListaMatriculasAlunoSerializer
 
 
 class ListaAlunosMatriculados(generics.ListAPIView):
     """Listando alunos e alunas matriculados em um curso"""
-
     def get_queryset(self):
         queryset = Matricula.objects.filter(curso_id=self.kwargs['pk'])
         return queryset
-
     serializer_class = ListaAlunosMatriculadosSerializer

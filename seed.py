@@ -31,7 +31,7 @@ def criando_cursos(quantidade_de_cursos):
         descricao = random.choice(descs)
         descs.remove(descricao)
         nivel = random.choice("BIA")
-        c = Curso(codigo_curso=codigo_curso,descricao=descricao, nivel=nivel)
+        c = Curso(codigo_curso=codigo_curso, descricao=descricao, nivel=nivel)
         c.save()
 
 
